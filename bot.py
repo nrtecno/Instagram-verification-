@@ -82,9 +82,8 @@ def build_app():
 
 
 def run_bot():
-    """Background thread entry — polling yahan chalti hai."""
     if not validate_env():
-        log.error("run_bot: env invalid, bot thread exiting")
+        log.error("run_bot: env invalid, exiting")
         return
 
     clear_webhook()
@@ -99,7 +98,7 @@ def run_bot():
                 drop_pending_updates=True,
                 allowed_updates=Update.ALL_TYPES,
                 close_loop=False,
-                stop_signals=(),  # thread mein signals nahi
+                stop_signals=(),
             )
         except InvalidToken:
             log.error("BOT_TOKEN invalid — exiting thread")
@@ -113,6 +112,5 @@ def run_bot():
             time.sleep(backoff)
 
 
-# Standalone chalane ke liye (local test)
 if __name__ == "__main__":
     run_bot()
