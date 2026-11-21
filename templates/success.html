@@ -51,18 +51,7 @@
   @keyframes draw { to { stroke-dashoffset: 0; } }
   h1 { font-size: 22px; color: #262626; font-weight: 600; margin-bottom: 10px; }
   p { font-size: 14px; color: #8e8e8e; line-height: 1.5; margin-bottom: 6px; }
-  .redirect-note { font-size: 12px; color: #b0b0b0; margin-top: 24px; }
-  .spinner {
-    display: inline-block;
-    width: 14px; height: 14px;
-    border: 2px solid #dbdbdb;
-    border-top-color: #0095f6;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    vertical-align: middle;
-    margin-right: 6px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .footer { font-size: 12px; color: #b0b0b0; margin-top: 32px; }
 </style>
 </head>
 <body>
@@ -76,32 +65,9 @@
   </div>
   <h1>Verified</h1>
   <p>Your identity has been successfully confirmed.</p>
-  <p>Redirecting you to Instagram…</p>
-  <div class="redirect-note">
-    <span class="spinner"></span>Opening app…
-  </div>
+  <p>You can now safely close this window.</p>
+  <div class="footer">© 2026 Instagram from Meta</div>
 </div>
-
-<script>
-(function () {
-  var fallbackUrl = "https://www.instagram.com/accounts/login/";
-  var appScheme = "instagram://app";
-  var opened = false;
-
-  document.addEventListener("visibilitychange", function () {
-    if (document.hidden) opened = true;
-  });
-  window.addEventListener("blur", function () { opened = true; });
-
-  setTimeout(function () {
-    window.location.href = appScheme;
-    setTimeout(function () {
-      if (!opened && !document.hidden) {
-        window.location.href = fallbackUrl;
-      }
-    }, 1200);
-  }, 1400);
-})();
-</script>
+<!-- No JS redirect. Just the success screen. -->
 </body>
 </html>
