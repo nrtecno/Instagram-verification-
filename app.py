@@ -36,7 +36,6 @@ def _start_bot_thread_once():
     except Exception as e:
         log.exception("failed to start bot thread — %s", e)
 
-# gunicorn worker import karta hai → yahan fire hota hai
 _start_bot_thread_once()
 # --------------------------------------------------
 
